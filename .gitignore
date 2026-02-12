@@ -1,0 +1,82 @@
+# JARO Project - Git Ignore File
+
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+jaro
+jaro.exe
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+coverage.txt
+coverage.html
+
+# Dependency directories
+vendor/
+
+# Go workspace file
+go.work
+go.work.sum
+
+# Environment variables and secrets
+.env
+.env.local
+.env.*.local
+*.key
+*.pem
+secrets/
+config.local.yaml
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Build artifacts
+dist/
+build/
+bin/
+*.log
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Windows specific
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Test cache
+.cache/
+
+# Documentation build artifacts (if using godoc or similar)
+docs/_build/
+
+# Database files (if using local SQLite for testing)
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+logs/
+*.log
+
+# Local configuration (not to be committed)
+config.local.json
+config.local.yaml
+config.local.toml
+
+# Backup files
+*.bak
+*.backup
