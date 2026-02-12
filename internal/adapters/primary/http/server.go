@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/JAROBOTAI/jaro/internal/config"
 	"github.com/JAROBOTAI/jaro/internal/core/ports"
 	"github.com/gin-gonic/gin"
 )
@@ -13,22 +14,26 @@ import (
 // This is a Primary Adapter (driving side) that receives external requests.
 type Server struct {
 	orchestrator ports.Orchestrator
+	config       *config.Config
 }
 
-// NewServer creates a new HTTP server with the given orchestrator.
+// NewServer creates a new HTTP server with the given orchestrator and configuration.
 // Purpose: Factory function for creating the HTTP API adapter with dependency injection.
 // Inputs:
 //   - orch: Implementation of the Orchestrator port for handling business logic
+//   - cfg: Configuration settings for server limits, timeouts, and security
 // Outputs:
 //   - *Server: Initialized HTTP server ready to handle requests
-func NewServer(orch ports.Orchestrator) *Server {
+func NewServer(orch ports.Orchestrator, cfg *config.Config) *Server {
 	return &Server{
 		orchestrator: orch,
+		config:       cfg,
 	}
 }
 
 // Run starts the HTTP server on the specified address.
 // Purpose: Configures routes and starts the Gin HTTP server.
+//          Applies configuration limits and security settings.
 //          This method blocks until the server is stopped or encounters an error.
 // Inputs:
 //   - addr: Network address to listen on (e.g., ":8080", "0.0.0.0:3000")
@@ -37,6 +42,9 @@ func NewServer(orch ports.Orchestrator) *Server {
 func (s *Server) Run(addr string) error {
 	// Create Gin router with default middleware (logger, recovery)
 	router := gin.Default()
+
+	// Apply configuration limits
+	router.MaxMultipartMemory = s.config.MaxFileUploadSize
 
 	// Health check endpoint
 	router.GET("/health", s.healthCheckHandler)

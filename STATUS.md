@@ -1,10 +1,10 @@
 # JARO Project Status
 
-**Last Updated:** 2026-02-12 04:45:00 (Session 1 - FINAL)  
-**Current Phase:** Phase 2 Complete - HTTP API & Architecture Hardening + Context Persistence + GitHub  
-**Next Phase:** Phase 3 - Configuration Layer & Real LLM Integration  
+**Last Updated:** 2026-02-13 00:21:00 (Session 2 - T-70 Complete)  
+**Current Phase:** Phase 3 Started - Configuration Layer Complete ✅  
+**Next Phase:** Phase 3 Continued - Real LLM Integration  
 **Repository:** https://github.com/JAROBOTAI/jaro ✅ **LIVE**  
-**Session:** 1 Complete → 2 Ready
+**Session:** 2 (T-70 Configuration Layer)
 
 ---
 
@@ -79,7 +79,8 @@
   3. Task status retrieval (GET)
   4. 404 error handling
 - **Status:** ✅ All 4/4 tests passing (100%)
-- **Last Run:** 2026-02-12 03:31:45 (Session 1)
+- **Last Run:** 2026-02-13 00:21:00 (Session 2, after T-70 config changes)
+- **Regression:** Zero - Config changes fully backward compatible
 
 ### Cross-Cutting Ports (T-60+) ✅
 - **Interfaces:** Clock, IDGenerator, Logger
@@ -96,6 +97,33 @@
 - **Purpose:** Maintain continuity across AI sessions
 - **Status:** ✅ Implemented and documented
 - **Next Session Protocol:** Defined and ready
+
+### Configuration Layer (T-70) ✅ **[NEW - Session 2]**
+- **Location:** `internal/config/` (2 files, 295 lines)
+- **Files:**
+  - `config.go` (65 lines) - Config struct with 15+ settings
+  - `loader.go` (230 lines) - Environment loading & validation
+- **Features:**
+  - ✅ Environment variable support (all settings overridable)
+  - ✅ Sensible defaults (8080, 10MB body, 50MB uploads)
+  - ✅ Validation with error messages
+  - ✅ LLM API key loading (OpenAI, Anthropic)
+  - ✅ Feature flags (EnableMetrics)
+  - ✅ Helper methods (HasOpenAIKey, HasAnthropicKey)
+- **Security:**
+  - ✅ `.env.example` created (placeholders only)
+  - ✅ `.gitignore` updated (*.key, *.pem, secrets/)
+  - ✅ Zero secrets in code
+- **Integration:**
+  - ✅ `main.go` loads config via `LoadFromEnv()`
+  - ✅ HTTP server accepts config in constructor
+  - ✅ Server applies `MaxFileUploadSize` limit
+- **Status:** ✅ Fully implemented, tested, zero regression
+- **Verification:**
+  - ✅ `go build ./...` compiles successfully
+  - ✅ Default config (8080) works
+  - ✅ Env override (9090) works
+  - ✅ All API tests pass (4/4) - 100%
 
 ### Version Control & GitHub ✅
 - **Repository:** https://github.com/JAROBOTAI/jaro
@@ -117,8 +145,11 @@
 ```
 JARO/ (Root: d:\Dropbox\PROJEKTI\JARO)
 ├── cmd/jaro/
-│   └── main.go (84 lines) - Entry point + HTTP server startup
+│   └── main.go (100 lines) - Entry point + Config + HTTP startup
 ├── internal/
+│   ├── config/ (2 files, 295 total lines) **[NEW - T-70]**
+│   │   ├── config.go (65) - Config struct
+│   │   └── loader.go (230) - Env loading & validation
 │   ├── core/
 │   │   ├── domain/ (5 files, 113 total lines)
 │   │   │   ├── task.go (40) - Task entity
@@ -140,31 +171,38 @@ JARO/ (Root: d:\Dropbox\PROJEKTI\JARO)
 │       │   ├── naive_planner.go (74) - Mock planner
 │       │   ├── naive_executor.go (59) - Mock executor
 │       │   └── crosscutting.go (115) - Sys impls
-│       └── primary/http/ (1 file, 161 lines)
-│           └── server.go - REST API
-├── Documentation (6 MD files, 1400+ lines)
+│       └── primary/http/ (1 file, 168 lines)
+│           └── server.go - REST API + Config support
+├── Documentation (7 MD files, 1400+ lines)
 │   ├── .cursorrules (187 lines, 11 sections)
-│   ├── STATUS.md (this file, 400+ lines)
+│   ├── STATUS.md (this file, 450+ lines)
 │   ├── README.md (170 lines)
 │   ├── CONTEXT_PERSISTENCE.md (300+ lines)
 │   ├── CURSORRULES_SHARPENING.md (250+ lines)
 │   ├── CURSORRULES_QUICKREF.md (200+ lines)
 │   └── IMPLEMENTATION_T60.md (280+ lines)
+├── Security & Config
+│   ├── .env.example **[NEW - T-70]** - Safe config template
+│   └── .gitignore - Secrets protection
 └── Build artifacts
     ├── jaro.exe (compiled binary)
     └── test_api.ps1 (82 lines, test suite)
 ```
 
 ### Code Statistics:
-- **Total Go Files:** 17
-- **Total Go Lines:** ~1,150 lines
-- **Core (internal/core):** ~450 lines (39%)
-- **Adapters (internal/adapters):** ~520 lines (45%)
-- **Main (cmd/jaro):** ~84 lines (7%)
+- **Total Go Files:** 19 (was 17, +2 config files)
+- **Total Go Lines:** ~1,500 lines (was ~1,150, +350 lines)
+- **Core (internal/core):** ~450 lines (30%)
+- **Config (internal/config):** ~295 lines (20%) **[NEW]**
+- **Adapters (internal/adapters):** ~520 lines (35%)
+- **Main (cmd/jaro):** ~100 lines (7%, was ~84)
 - **Test Files:** 1 PowerShell script (82 lines)
 
 ### Dependency Wiring (main.go):
 ```go
+// Load configuration from environment
+cfg := config.LoadFromEnv()  // ← New: Config layer
+
 // Initialize adapters
 repo := memory.NewTaskRepository()
 audit := memory.NewAuditRepository()
@@ -180,11 +218,12 @@ orchestrator := services.NewOrchestrator(
     clock, idGen, logger,
 )
 
-// Initialize HTTP adapter
-httpServer := http.NewServer(orchestrator)
+// Initialize HTTP adapter with config
+httpServer := http.NewServer(orchestrator, cfg)  // ← Updated: Now accepts config
 
-// Start server on port 8080
-httpServer.Run(":8080")
+// Start server using config port
+serverAddr := fmt.Sprintf("%s:%d", cfg.ServerHost, cfg.ServerPort)
+httpServer.Run(serverAddr)  // ← Dynamic address from config
 ```
 
 ### Architecture Compliance Audit:
@@ -196,6 +235,7 @@ httpServer.Run(":8080")
 - ✅ **Adapter Isolation:** No adapter types in Core signatures
 - ✅ **GoDoc Coverage:** 100% of exported types
 - ✅ **Error Wrapping:** All errors use `%w` format
+- ✅ **Configuration Externalized:** Zero magic numbers, all in Config struct **[NEW - T-70]**
 
 ---
 
@@ -205,13 +245,13 @@ httpServer.Run(":8080")
 1. **NaivePlanner uses hardcoded 2-step plan**
    - **Location:** `internal/adapters/memory/naive_planner.go`
    - **Why:** Testing/demo adapter, will be replaced with real LLM planner
-   - **When to fix:** Phase 3 (LLM Integration)
+   - **When to fix:** Phase 3 (LLM Integration - NEXT TASK)
    - **Impact:** Low - isolated in adapter, doesn't affect core logic
-   - **Action:** Keep until OpenAI adapter ready
+   - **Action:** Replace with real OpenAI adapter (T-71)
 
 2. **No persistent database**
    - **Current:** In-memory storage (data lost on restart)
-   - **Why:** In-memory sufficient for Phase 1-2 development
+   - **Why:** In-memory sufficient for Phase 1-3 development
    - **When to fix:** Phase 4 (PostgreSQL adapter)
    - **Impact:** Medium - not production-ready for stateful workloads
    - **Action:** Acceptable for development, critical for production
@@ -237,14 +277,7 @@ httpServer.Run(":8080")
    - **Impact:** Low - placeholder working as intended
    - **Action:** Replace when implementing real execution loop
 
-6. **Hardcoded port 8080**
-   - **Location:** `cmd/jaro/main.go` line ~50
-   - **Why:** Simple for development
-   - **When to fix:** T-70 (Configuration Layer) - NEXT TASK
-   - **Impact:** Low - but violates config rule
-   - **Action:** Move to config in next task
-
-7. **No authentication/authorization**
+6. **No authentication/authorization**
    - **Current:** Open API, no security
    - **Why:** Development phase, authentication not needed yet
    - **When to fix:** Phase 4 (JWT/API key middleware)
@@ -252,106 +285,77 @@ httpServer.Run(":8080")
    - **Action:** Critical for production deployment
 
 ### Critical (Must Fix Soon):
-- **None currently** - All architecture violations resolved
-- **Next:** Configuration layer (T-70) to remove magic numbers
+- **None currently** - All architecture violations resolved ✅
+- **T-70 COMPLETED** - Configuration layer fully implemented and tested ✅
 
 ---
 
 ## 🎯 NEXT STEP
 
-**Immediate Task:** T-70 - Configuration Layer  
+**Immediate Task:** T-71 - Real LLM Integration (OpenAI/Anthropic Adapter)  
 **Priority:** HIGH  
-**Estimated Effort:** 30-45 minutes  
-**Session:** 2 (this will be first task in next session)
+**Estimated Effort:** 60-90 minutes  
+**Session:** 2 (continuation) or 3
 
 ### What to Build:
 
-#### 1. File: `internal/config/config.go`
-Define `Config` struct with all application settings:
+#### 1. File: `internal/adapters/llm/openai_provider.go`
+Implement real `ports.LLMProvider` using OpenAI SDK:
 ```go
-type Config struct {
-    // Server settings
-    ServerPort     int    `env:"SERVER_PORT" default:"8080"`
-    ServerHost     string `env:"SERVER_HOST" default:"0.0.0.0"`
-    
-    // Timeouts
-    RequestTimeout time.Duration `env:"REQUEST_TIMEOUT" default:"30s"`
-    IdleTimeout    time.Duration `env:"IDLE_TIMEOUT" default:"60s"`
-    
-    // Limits
-    MaxBodySize       int64 `env:"MAX_BODY_SIZE" default:"10485760"` // 10MB
-    MaxFileUploadSize int64 `env:"MAX_FILE_SIZE" default:"52428800"` // 50MB
-    
-    // Security
-    AllowedMIMETypes []string `env:"ALLOWED_MIMES"`
-    
-    // Logging
-    LogLevel string `env:"LOG_LEVEL" default:"info"`
-    
-    // Feature flags (future)
-    EnableMetrics bool `env:"ENABLE_METRICS" default:"false"`
-}
-```
-
-#### 2. File: `internal/config/loader.go`
-Implement config loading:
-```go
-func LoadFromEnv() (*Config, error)
-func LoadFromFile(path string) (*Config, error)
-func NewDefaultConfig() *Config
-func (c *Config) Validate() error
-```
-
-#### 3. Update: `cmd/jaro/main.go`
-```go
-// Load config at startup
-config := config.NewDefaultConfig()
-if envConfig, err := config.LoadFromEnv(); err == nil {
-    config = envConfig
+type OpenAIProvider struct {
+    client *openai.Client
+    config *config.Config
+    logger ports.Logger
 }
 
-// Pass to HTTP server
-httpServer := http.NewServer(orchestrator, config)
-httpServer.Run(fmt.Sprintf(":%d", config.ServerPort))
+// Implement GenerateText using actual OpenAI API
+// Use cfg.OpenAIAPIKey, cfg.DefaultLLMModel, cfg.LLMTimeout
 ```
 
-#### 4. Update: `internal/adapters/primary/http/server.go`
+#### 2. File: `internal/adapters/llm/anthropic_provider.go` (Optional, if time permits)
+Implement Anthropic alternative.
+
+#### 3. File: `internal/adapters/llm/llm_planner.go`
+Replace `NaivePlanner` with real LLM-powered planner:
 ```go
-type Server struct {
-    orchestrator ports.Orchestrator
-    config       *config.Config  // Add config
+type LLMPlanner struct {
+    provider ports.LLMProvider
+    logger   ports.Logger
 }
 
-func (s *Server) Run(addr string) error {
-    router := gin.Default()
-    
-    // Use config for middleware
-    router.Use(gin.Recovery())
-    router.MaxMultipartMemory = s.config.MaxFileUploadSize
-    
-    // ... routes ...
-    
-    return router.Run(addr)
+// CreatePlan: Use provider.GenerateText with structured prompt
+// Parse JSON response into domain.Plan
+```
+
+#### 4. Update: `cmd/jaro/main.go`
+```go
+// Conditional initialization based on API key
+var planner ports.Planner
+if cfg.HasOpenAIKey() {
+    llmProvider := llm.NewOpenAIProvider(cfg, logger)
+    planner = llm.NewLLMPlanner(llmProvider, logger)
+} else {
+    planner = memory.NewNaivePlanner()  // Fallback
 }
 ```
 
 ### Why This Task:
-- ✅ Removes magic numbers from code (`.cursorrules` Section 5)
-- ✅ Enables different configs for dev/staging/prod
-- ✅ Prepares for LLM API key loading (Phase 3)
-- ✅ Satisfies Definition of Done requirement (no hardcoded values)
+- ✅ Enables real AI planning (replaces hardcoded 2-step plan)
+- ✅ Validates Config system with API key loading
+- ✅ Demonstrates adapter swapping (Naive → Real LLM)
+- ✅ Tests ports architecture under real conditions
 
 ### Definition of Done:
-- [ ] `Config` struct defined with all settings
-- [ ] Environment variable loading works
-- [ ] File-based config loading works
-- [ ] Default config has sensible values
-- [ ] HTTP server uses config for port and limits
-- [ ] No hardcoded numbers in code (except defaults in config)
+- [ ] OpenAI SDK added to `go.mod`
+- [ ] `OpenAIProvider` implements `ports.LLMProvider`
+- [ ] `LLMPlanner` implements `ports.Planner` using LLM
+- [ ] Config API key validation works
+- [ ] System falls back to NaivePlanner if no API key
+- [ ] Real LLM generates valid `domain.Plan` from user input
 - [ ] All exported types have GoDoc
 - [ ] `go build ./...` succeeds
-- [ ] `test_api.ps1` still passes (no regression)
-- [ ] `STATUS.md` updated with T-70 completion
+- [ ] Integration test with real OpenAI API (if key available)
+- [ ] `STATUS.md` updated with T-71 completion
 
 ---
 
